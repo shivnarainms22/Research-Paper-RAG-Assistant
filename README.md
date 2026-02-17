@@ -222,7 +222,3 @@ ruff check src/ tests/
                     └─────────────┘
 ```
 
-## License
-
-MIT License - see LICENSE file for details.
-
