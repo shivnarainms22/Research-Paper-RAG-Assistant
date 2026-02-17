@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Research Paper RAG</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Söhne,ui-sans-serif,system-ui,sans-serif&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --sidebar-bg: #171717;
+            --main-bg: #212121;
+            --input-bg: #2f2f2f;
+            --hover-bg: #2f2f2f;
+            --border-color: #424242;
+            --text-primary: #ececec;
+            --text-secondary: #b4b4b4;
+            --text-muted: #8e8e8e;
+            --accent: #10a37f;
+            --accent-hover: #1a7f64;
+            --user-msg-bg: #2f2f2f;
+            --code-bg: #1e1e1e;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Söhne', ui-sans-serif, system-ui, -apple-system, sans-serif;
+            background: var(--main-bg);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .app-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 260px;
+            background: var(--sidebar-bg);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            transition: width 0.2s ease;
+        }
+
+        .sidebar.collapsed {
+            width: 0;
+            overflow: hidden;
+        }
+
+        .sidebar-header {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .new-chat-btn {
+            width: 100%;
+            padding: 12px 16px;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: background 0.15s ease;
+        }
+
+        .new-chat-btn:hover {
+            background: var(--hover-bg);
+        }
+
+        .new-chat-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .sidebar-section {
+            margin-bottom: 16px;
+        }
+
+        .sidebar-section-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            padding: 8px 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .paper-item {
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--text-secondary);
+            white-space: normal;
+            word-wrap: break-word;
+            transition: background 0.15s ease;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .paper-item:hover {
+            background: var(--hover-bg);
+            color: var(--text-primary);
+        }
+
+        .paper-item.selected {
+            background: var(--accent);
+            color: white;
+        }
+
+        .paper-item.selected:hover {
+            background: var(--accent-hover);
+        }
+
+        .paper-name {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .delete-btn {
+            opacity: 0;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: opacity 0.15s, background 0.15s, color 0.15s;
+            flex-shrink: 0;
+        }
+
+        .paper-item:hover .delete-btn {
+            opacity: 1;
+        }
+
+        .delete-btn:hover {
+            background: #ef4444;
+            color: white;
+        }
+
+        .paper-item.selected .delete-btn {
+            color: rgba(255,255,255,0.7);
+        }
+
+        .paper-item.selected .delete-btn:hover {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+
+        .clear-filter {
+            font-size: 12px;
+            color: var(--text-muted);
+            padding: 6px 12px;
+            cursor: pointer;
+            display: none;
+            word-wrap: break-word;
+        }
+
+        .clear-filter:hover {
+            color: var(--text-primary);
+        }
+
+        .clear-filter.visible {
+            display: block;
+        }
+
+        .sidebar-footer {
+            padding: 12px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .upload-btn {
+            width: 100%;
+            padding: 10px 16px;
+            background: var(--accent);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: background 0.15s ease;
+        }
+
+        .upload-btn:hover {
+            background: var(--accent-hover);
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .toggle-sidebar-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .toggle-sidebar-btn:hover {
+            background: var(--hover-bg);
+            color: var(--text-primary);
+        }
+
+        .model-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--input-bg);
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .model-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--accent);
+            border-radius: 50%;
+        }
+
+        /* Chat Area */
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0;
+        }
+
+        .chat-messages {
+            max-width: 768px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .message {
+            margin-bottom: 24px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .avatar-user {
+            background: #5436DA;
+            color: white;
+        }
+
+        .avatar-assistant {
+            background: var(--accent);
+            color: white;
+        }
+
+        .message-author {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .message-content {
+            padding-left: 40px;
+            font-size: 15px;
+            line-height: 1.7;
+            color: var(--text-primary);
+        }
+
+        .message-content p {
+            margin-bottom: 12px;
+        }
+
+        .message-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        .message-content h1 {
+            font-size: 20px;
+            font-weight: 600;
+            margin: 24px 0 12px;
+            color: var(--text-primary);
+        }
+
+        .message-content h2 {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 20px 0 10px;
+            color: var(--text-primary);
+        }
+
+        .message-content h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 18px 0 8px;
+            color: var(--text-primary);
+        }
+
+        .message-content h4 {
+            font-size: 15px;
+            font-weight: 600;
+            margin: 16px 0 6px;
+            color: var(--text-primary);
+        }
+
+        .message-content ul, .message-content ol {
+            margin: 12px 0 12px 24px;
+            padding: 0;
+        }
+
+        .message-content li {
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+
+        .message-content li::marker {
+            color: var(--accent);
+        }
+
+        .message-content code {
+            background: var(--code-bg);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'SF Mono', Monaco, Consolas, monospace;
+            font-size: 13px;
+        }
+
+        .message-content pre {
+            background: var(--code-bg);
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 16px 0;
+            border: 1px solid var(--border-color);
+        }
+
+        .message-content pre code {
+            background: none;
+            padding: 0;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .message-content blockquote {
+            border-left: 3px solid var(--accent);
+            margin: 16px 0;
+            padding: 8px 16px;
+            background: rgba(16, 163, 127, 0.1);
+            border-radius: 0 8px 8px 0;
+        }
+
+        .message-content strong {
+            font-weight: 600;
+        }
+
+        .citations {
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .citations-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .citation-item {
+            display: block;
+            background: var(--input-bg);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin: 4px 0;
+            font-family: 'SF Mono', Monaco, Consolas, monospace;
+            word-wrap: break-word;
+        }
+
+        /* Welcome Screen */
+        .welcome-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            padding: 24px;
+        }
+
+        .welcome-logo {
+            width: 72px;
+            height: 72px;
+            background: var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            margin-bottom: 24px;
+        }
+
+        .welcome-title {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .welcome-subtitle {
+            font-size: 16px;
+            color: var(--text-secondary);
+            margin-bottom: 40px;
+        }
+
+        .suggestions {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        .suggestion-card {
+            background: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: left;
+            cursor: pointer;
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }
+
+        .suggestion-card:hover {
+            background: var(--hover-bg);
+            border-color: var(--text-muted);
+        }
+
+        .suggestion-title {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .suggestion-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        /* Input Area */
+        .input-area {
+            padding: 16px 24px 24px;
+            background: var(--main-bg);
+        }
+
+        .input-wrapper {
+            max-width: 768px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .input-container {
+            display: flex;
+            align-items: flex-end;
+            background: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 12px 16px;
+            transition: border-color 0.15s ease;
+        }
+
+        .input-container:focus-within {
+            border-color: var(--text-muted);
+        }
+
+        textarea {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 15px;
+            line-height: 1.5;
+            resize: none;
+            max-height: 200px;
+            outline: none;
+        }
+
+        textarea::placeholder {
+            color: var(--text-muted);
+        }
+
+        .send-btn {
+            width: 32px;
+            height: 32px;
+            background: var(--accent);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 8px;
+            flex-shrink: 0;
+            transition: background 0.15s ease, opacity 0.15s ease;
+        }
+
+        .send-btn:hover {
+            background: var(--accent-hover);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .send-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .input-footer {
+            text-align: center;
+            margin-top: 12px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        /* Loading Animation */
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 4px 0;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            animation: typing 1.4s ease-in-out infinite;
+        }
+
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+            30% { transform: translateY(-4px); opacity: 1; }
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--input-bg);
+            border: 1px solid var(--border-color);
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            animation: toastIn 0.3s ease;
+            z-index: 1000;
+            max-width: 80%;
+            text-align: center;
+            word-wrap: break-word;
+        }
+
+        .toast.success { border-color: var(--accent); }
+        .toast.error { border-color: #ef4444; }
+
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                height: 100%;
+                z-index: 100;
+            }
+
+            .sidebar.collapsed {
+                transform: translateX(-100%);
+            }
+
+            .suggestions {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <button class="new-chat-btn" onclick="clearChat()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                    New chat
+                </button>
+            </div>
+
+            <div class="sidebar-content">
+                <div class="sidebar-section">
+                    <div class="sidebar-section-title">Indexed Papers</div>
+                    <div class="clear-filter" id="clear-filter" onclick="clearPaperFilter()">✕ Clear filter (searching all)</div>
+                    <div id="paper-list">
+                        <div class="paper-item" style="color: var(--text-muted);">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <button class="upload-btn" onclick="document.getElementById('file-input').click()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    Upload PDF
+                </button>
+                <input type="file" id="file-input" accept=".pdf">
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <button class="toggle-sidebar-btn" onclick="toggleSidebar()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                        <path d="M9 3v18"/>
+                    </svg>
+                </button>
+
+                <div class="model-selector">
+                    <div class="model-dot"></div>
+                    <span>Research Paper RAG</span>
+                </div>
+
+                <div style="width: 36px;"></div>
+            </header>
+
+            <div class="chat-container" id="chat-container">
+                <div class="chat-messages" id="chat-messages">
+                    <div class="welcome-screen" id="welcome-screen">
+                        <div class="welcome-logo">📚</div>
+                        <h1 class="welcome-title">Research Paper RAG</h1>
+                        <p class="welcome-subtitle">Ask questions about your ML/AI research papers</p>
+
+                        <div class="suggestions">
+                            <div class="suggestion-card" onclick="askQuestion('Explain this paper in detail, including its main ideas, methodology, and key findings')">
+                                <div class="suggestion-title">Explain the paper</div>
+                                <div class="suggestion-desc">Get a detailed overview</div>
+                            </div>
+                            <div class="suggestion-card" onclick="askQuestion('What are the key equations and what do they mean?')">
+                                <div class="suggestion-title">Explain equations</div>
+                                <div class="suggestion-desc">Math in plain English</div>
+                            </div>
+                            <div class="suggestion-card" onclick="askQuestion('What are the main contributions of this paper?')">
+                                <div class="suggestion-title">Main contributions</div>
+                                <div class="suggestion-desc">Summarize key findings</div>
+                            </div>
+                            <div class="suggestion-card" onclick="askQuestion('What are the limitations mentioned in the paper?')">
+                                <div class="suggestion-title">Limitations</div>
+                                <div class="suggestion-desc">Identify weaknesses</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-area">
+                <div class="input-wrapper">
+                    <div class="input-container">
+                        <textarea 
+                            id="question-input" 
+                            placeholder="Message Research Paper RAG..."
+                            rows="1"
+                            onkeydown="handleKeyDown(event)"
+                            oninput="autoResize(this)"
+                        ></textarea>
+                        <button class="send-btn" id="send-btn" onclick="sendQuestion()">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="input-footer">
+                        Research Paper RAG can make mistakes. Verify important information.
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        let selectedPaper = null;  // Currently selected paper filter
+
+        // Auto-resize textarea
+        function autoResize(el) {
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+        }
+
+        // Toggle sidebar
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('collapsed');
+        }
+
+        // Select a paper to filter questions
+        function selectPaper(paperTitle) {
+            if (selectedPaper === paperTitle) {
+                // Clicking same paper deselects it
+                clearPaperFilter();
+                return;
+            }
+            
+            selectedPaper = paperTitle;
+            
+            // Update UI
+            document.querySelectorAll('.paper-item').forEach(item => {
+                item.classList.remove('selected');
+                if (item.dataset.paper === paperTitle) {
+                    item.classList.add('selected');
+                }
+            });
+            
+            document.getElementById('clear-filter').classList.add('visible');
+            document.getElementById('clear-filter').textContent = `✕ Filtering: ${paperTitle}`;
+            
+            showToast(`Filtering to: ${paperTitle}`, 'success');
+        }
+
+        // Clear paper filter
+        function clearPaperFilter() {
+            selectedPaper = null;
+            document.querySelectorAll('.paper-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            document.getElementById('clear-filter').classList.remove('visible');
+            showToast('Searching all papers', 'info');
+        }
+
+        // Delete a paper
+        async function deletePaper(paperTitle) {
+            if (!confirm(`Delete "${paperTitle}"?\n\nThis will remove all indexed chunks for this paper.`)) {
+                return;
+            }
+
+            showToast(`Deleting "${paperTitle}"...`);
+
+            try {
+                const response = await fetch(`${API_BASE}/papers/${encodeURIComponent(paperTitle)}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showToast(`✓ Deleted ${result.chunks_deleted} chunks`, 'success');
+                    
+                    // Clear filter if we deleted the selected paper
+                    if (selectedPaper === paperTitle) {
+                        clearPaperFilter();
+                    }
+                    
+                    // Reload paper list
+                    loadPapers();
+                } else {
+                    showToast(`Error: ${result.detail}`, 'error');
+                }
+            } catch (e) {
+                showToast('Delete failed', 'error');
+            }
+        }
+
+        // Load papers
+        async function loadPapers() {
+            try {
+                const response = await fetch(`${API_BASE}/papers`);
+                const papers = await response.json();
+                
+                const list = document.getElementById('paper-list');
+                
+                if (papers.length === 0) {
+                    list.innerHTML = '<div class="paper-item" style="color: var(--text-muted); font-style: italic;">No papers indexed</div>';
+                } else {
+                    list.innerHTML = papers.map(p => {
+                        const isSelected = selectedPaper === p ? 'selected' : '';
+                        const escapedPaper = escapeHtml(p).replace(/'/g, "\\'");
+                        return `<div class="paper-item ${isSelected}" data-paper="${escapeHtml(p)}">
+                            <span class="paper-name" onclick="selectPaper('${escapedPaper}')" title="Click to filter: ${escapeHtml(p)}">${escapeHtml(p)}</span>
+                            <button class="delete-btn" onclick="event.stopPropagation(); deletePaper('${escapedPaper}')" title="Delete paper">✕</button>
+                        </div>`;
+                    }).join('');
+                }
+            } catch (e) {
+                document.getElementById('paper-list').innerHTML = 
+                    '<div class="paper-item" style="color: #ef4444;">API unavailable</div>';
+            }
+        }
+
+        function truncate(str, len) {
+            return str.length > len ? str.substring(0, len) + '...' : str;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // File upload
+        document.getElementById('file-input').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            showToast(`Uploading ${file.name}...`);
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch(`${API_BASE}/papers/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showToast(`✓ Indexed ${result.chunks_indexed} chunks from "${result.paper_title}"`, 'success');
+                    await loadPapers();
+                    // Auto-select the newly uploaded paper
+                    if (result.paper_title) {
+                        selectPaper(result.paper_title);
+                    }
+                } else {
+                    showToast(`Error: ${result.detail}`, 'error');
+                }
+            } catch (e) {
+                showToast('Upload failed', 'error');
+            }
+
+            e.target.value = '';
+        });
+
+        // Clear chat
+        function clearChat() {
+            const messages = document.getElementById('chat-messages');
+            messages.innerHTML = `
+                <div class="welcome-screen" id="welcome-screen">
+                    <div class="welcome-logo">📚</div>
+                    <h1 class="welcome-title">Research Paper RAG</h1>
+                    <p class="welcome-subtitle">Ask questions about your ML/AI research papers</p>
+
+                    <div class="suggestions">
+                        <div class="suggestion-card" onclick="askQuestion('Explain this paper in detail, including its main ideas, methodology, and key findings')">
+                            <div class="suggestion-title">Explain the paper</div>
+                            <div class="suggestion-desc">Get a detailed overview</div>
+                        </div>
+                        <div class="suggestion-card" onclick="askQuestion('What are the key equations and what do they mean?')">
+                            <div class="suggestion-title">Explain equations</div>
+                            <div class="suggestion-desc">Math in plain English</div>
+                        </div>
+                        <div class="suggestion-card" onclick="askQuestion('What are the main contributions of this paper?')">
+                            <div class="suggestion-title">Main contributions</div>
+                            <div class="suggestion-desc">Summarize key findings</div>
+                        </div>
+                        <div class="suggestion-card" onclick="askQuestion('What are the limitations mentioned in the paper?')">
+                            <div class="suggestion-title">Limitations</div>
+                            <div class="suggestion-desc">Identify weaknesses</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Handle keyboard
+        function handleKeyDown(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendQuestion();
+            }
+        }
+
+        function askQuestion(question) {
+            document.getElementById('question-input').value = question;
+            sendQuestion();
+        }
+
+        // Send question
+        async function sendQuestion() {
+            const input = document.getElementById('question-input');
+            const question = input.value.trim();
+
+            if (!question) return;
+
+            const messagesDiv = document.getElementById('chat-messages');
+            const sendBtn = document.getElementById('send-btn');
+            const container = document.getElementById('chat-container');
+
+            // Remove welcome screen
+            const welcome = document.getElementById('welcome-screen');
+            if (welcome) welcome.remove();
+
+            // Add user message
+            messagesDiv.innerHTML += `
+                <div class="message">
+                    <div class="message-header">
+                        <div class="avatar avatar-user">Y</div>
+                        <div class="message-author">You</div>
+                    </div>
+                    <div class="message-content">${escapeHtml(question)}</div>
+                </div>
+            `;
+
+            // Add loading
+            const loadingId = 'loading-' + Date.now();
+            messagesDiv.innerHTML += `
+                <div class="message" id="${loadingId}">
+                    <div class="message-header">
+                        <div class="avatar avatar-assistant">R</div>
+                        <div class="message-author">Research RAG</div>
+                    </div>
+                    <div class="message-content">
+                        <div class="typing-indicator">
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            container.scrollTop = container.scrollHeight;
+            input.value = '';
+            input.style.height = 'auto';
+            sendBtn.disabled = true;
+
+            try {
+                const requestBody = { question, top_k: 5 };
+                if (selectedPaper) {
+                    requestBody.paper_filter = selectedPaper;
+                }
+                
+                const response = await fetch(`${API_BASE}/ask`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+
+                const result = await response.json();
+                document.getElementById(loadingId).remove();
+
+                if (response.ok) {
+                    let answerHtml = formatAnswer(result.answer);
+
+                    // Add citations
+                    if (result.citations && result.citations.length > 0) {
+                        const validCitations = result.citations.filter(c => c && c.trim());
+                        if (validCitations.length > 0) {
+                            answerHtml += `
+                                <div class="citations">
+                                    <div class="citations-title">Sources</div>
+                                    ${validCitations.map(c => `<span class="citation-item">${escapeHtml(c)}</span>`).join('')}
+                                </div>
+                            `;
+                        }
+                    }
+
+                    messagesDiv.innerHTML += `
+                        <div class="message">
+                            <div class="message-header">
+                                <div class="avatar avatar-assistant">R</div>
+                                <div class="message-author">Research RAG</div>
+                            </div>
+                            <div class="message-content">${answerHtml}</div>
+                        </div>
+                    `;
+                } else {
+                    messagesDiv.innerHTML += `
+                        <div class="message">
+                            <div class="message-header">
+                                <div class="avatar avatar-assistant">R</div>
+                                <div class="message-author">Research RAG</div>
+                            </div>
+                            <div class="message-content" style="color: #ef4444;">
+                                Error: ${result.detail || 'Failed to get answer'}
+                            </div>
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                document.getElementById(loadingId)?.remove();
+                messagesDiv.innerHTML += `
+                    <div class="message">
+                        <div class="message-header">
+                            <div class="avatar avatar-assistant">R</div>
+                            <div class="message-author">Research RAG</div>
+                        </div>
+                        <div class="message-content" style="color: #ef4444;">
+                            Failed to connect to API. Run: <code>python main.py serve</code>
+                        </div>
+                    </div>
+                `;
+            }
+
+            sendBtn.disabled = false;
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function formatAnswer(text) {
+            // Handle code blocks first (before other replacements)
+            text = text.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>');
+            
+            // Handle headers (must be before other replacements)
+            text = text.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+            text = text.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+            text = text.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+            text = text.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+            
+            // Handle bold and italic
+            text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+            
+            // Handle inline code
+            text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+            
+            // Handle unordered lists
+            text = text.replace(/^[\s]*[-•]\s+(.+)$/gm, '<li>$1</li>');
+            text = text.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+            
+            // Handle numbered lists
+            text = text.replace(/^[\s]*\d+\.\s+(.+)$/gm, '<li>$1</li>');
+            
+            // Handle paragraphs and line breaks
+            text = text.replace(/\n\n+/g, '</p><p>');
+            text = text.replace(/\n/g, '<br>');
+            
+            // Wrap in paragraph if not already wrapped
+            if (!text.startsWith('<')) {
+                text = '<p>' + text + '</p>';
+            }
+            
+            // Clean up empty paragraphs and fix nesting
+            text = text.replace(/<p><\/p>/g, '');
+            text = text.replace(/<p>(<h[1-4]>)/g, '$1');
+            text = text.replace(/(<\/h[1-4]>)<\/p>/g, '$1');
+            text = text.replace(/<p>(<ul>)/g, '$1');
+            text = text.replace(/(<\/ul>)<\/p>/g, '$1');
+            text = text.replace(/<p>(<pre>)/g, '$1');
+            text = text.replace(/(<\/pre>)<\/p>/g, '$1');
+            
+            return text;
+        }
+
+        function showToast(message, type = 'info') {
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
+
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Initialize
+        loadPapers();
+    </script>
+</body>
+</html>
